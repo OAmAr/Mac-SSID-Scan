@@ -18,8 +18,13 @@ rm "$tmpdir"*reqs*  "$tmpdir"*macs*
 
 echo "Files in $tmpdir*$uuid"
 
+#echo "${iface}mon0"
+
 #Use airmon to start wlp2s0 (this will depend on interface, should be a variable)
 sudo airmon-ng start $iface &> /dev/null
+
+# Obtain name of the monitoring interface (on Arch Linux)
+moniface=`ip addr show | grep mon | cut -d: -f2 | cut -d' ' -f2`
 
 #If a packet file was provided, we just set reqs equal to that.
 if [ ! -z $reqset ]  
@@ -27,7 +32,9 @@ then
     reqs=$reqset
 else
     #Run tcpdump using monitor 0, verbose mode, printing link layer(to get mac address), limit size to 256, capture packets of type management and subtype probe request, pipe to tee to save to file and also print to stdout
-    sudo tcpdump -i mon0 -vv -e -s 256 type mgt subtype probe-req | tee "$reqs" &
+    # Note: ${iface} will return the contents of the $iface variable and allow for appending 'mon0' | Arch does not add the 0 to mon0
+    #sudo tcpdump -i ${iface}mon -vv -e -s 256 type mgt subtype probe-req | tee "$reqs" &
+    sudo tcpdump -i $moniface -vv -e -s 256 type mgt subtype probe-req | tee "$reqs" &
 
     #capture all the running jobs and store their pids in an array (This needs to be tested to see how it works with other running jobs)
     pids=(`jobs -l % | sed 's/^[^ ]* \+//' | cut -d\  -f1`)
@@ -61,7 +68,9 @@ while read line; do
     echo "$net" | sed '/^$/d' |  sed 's/^/   [+] /' 
     echo " "
 done <  "$macs" | tee "$output"
-sudo airmon-ng stop mon0 &> /dev/null
+echo "Stopping monitoring mode..."
+sudo airmon-ng stop $moniface &> /dev/null
+echo "Stopped the monitoring interface: $moniface"
 
 echo "Output is in $output"
 exit
